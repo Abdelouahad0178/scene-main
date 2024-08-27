@@ -66,7 +66,7 @@ function init() {
 function createWalls() {
     const wallGeometry = new THREE.PlaneGeometry(5, 3);
     
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0;  i < 2; i++) {
         const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
         walls[i] = new THREE.Mesh(wallGeometry, wallMaterial);
         
@@ -76,9 +76,12 @@ function createWalls() {
             walls[i].position.set(-2.5, 1.5, 0);
             walls[i].rotation.y = Math.PI / 2;
         }
-        
+
+        walls[i].userData.type = 'wall';  // Définir le type comme 'wall'
+        walls[i].userData.locked = true;  // Verrouiller le mur
+
         scene.add(walls[i]);
-        objects.push(walls[i]); // Ajout des murs à la liste des objets
+        objects.push(walls[i]); // Ajouter les murs à la liste des objets
     }
 }
 
@@ -87,8 +90,12 @@ function createFloor() {
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
+
+    floor.userData.type = 'floor';  // Définir le type comme 'floor'
+    floor.userData.locked = true;   // Verrouiller le sol
+
     scene.add(floor);
-    objects.push(floor); // Ajout du sol à la liste des objets
+    objects.push(floor); // Ajouter le sol à la liste des objets
 }
 
 function handleTextureFiles(event) {
@@ -203,12 +210,17 @@ function addObject(type) {
 }
 
 function selectObject(object) {
+    // Si l'objet est verrouillé, ne rien faire
+    if (object.userData.locked) {
+        console.log('L\'objet est verrouillé et ne peut pas être sélectionné:', object);
+        return;
+    }
+
     // Rechercher le groupe parent au lieu d'une sous-partie individuelle
     while (object.parent && object.parent.type !== 'Scene') {
         object = object.parent;
     }
 
-    // Si l'objet sélectionné est déjà sélectionné, ne rien faire
     if (selectedObject === object) {
         console.log('L\'objet est déjà sélectionné:', object);
         return;
@@ -233,6 +245,11 @@ function removeObject() {
 }
 
 function toggleObjectLock(object) {
+    if (object.userData.locked) {
+        console.log('L\'objet est verrouillé et ne peut pas être manipulé:', object);
+        return;
+    }
+
     console.log('Toggling lock for object:', object);
     if (object.userData.locked) {
         object.userData.locked = false;
@@ -253,7 +270,12 @@ function onMouseClick(event) {
     const intersects = raycaster.intersectObjects(objects, true);
 
     if (intersects.length > 0) {
-        selectObject(intersects[0].object);
+        const intersectedObject = intersects[0].object;
+        if (!intersectedObject.userData.locked) {
+            selectObject(intersectedObject);
+        } else {
+            console.log('Tentative de sélection d\'un objet verrouillé:', intersectedObject);
+        }
     }
 }
 
