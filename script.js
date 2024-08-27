@@ -28,7 +28,12 @@ function init() {
     controls.maxPolarAngle = Math.PI;
 
     transformControls = new THREE.TransformControls(camera, renderer.domElement);
+    transformControls.setMode("translate");
     scene.add(transformControls);
+
+    transformControls.addEventListener('change', function() {
+        checkObjectPosition(selectedObject);
+    });
 
     transformControls.addEventListener('dragging-changed', function(event) {
         controls.enabled = !event.value;
@@ -77,11 +82,11 @@ function createWalls() {
             walls[i].rotation.y = Math.PI / 2;
         }
 
-        walls[i].userData.type = 'wall';  // Définir le type comme 'wall'
-        walls[i].userData.locked = true;  // Verrouiller le mur
+        walls[i].userData.type = 'wall';
+        walls[i].userData.locked = true;
 
         scene.add(walls[i]);
-        objects.push(walls[i]); // Ajouter les murs à la liste des objets
+        objects.push(walls[i]);
     }
 }
 
@@ -91,11 +96,11 @@ function createFloor() {
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
 
-    floor.userData.type = 'floor';  // Définir le type comme 'floor'
-    floor.userData.locked = true;   // Verrouiller le sol
+    floor.userData.type = 'floor';
+    floor.userData.locked = true;
 
     scene.add(floor);
-    objects.push(floor); // Ajouter le sol à la liste des objets
+    objects.push(floor);
 }
 
 function handleTextureFiles(event) {
@@ -210,13 +215,11 @@ function addObject(type) {
 }
 
 function selectObject(object) {
-    // Si l'objet est verrouillé, ne rien faire
     if (object.userData.locked) {
         console.log('L\'objet est verrouillé et ne peut pas être sélectionné:', object);
         return;
     }
 
-    // Rechercher le groupe parent au lieu d'une sous-partie individuelle
     while (object.parent && object.parent.type !== 'Scene') {
         object = object.parent;
     }
@@ -232,6 +235,27 @@ function selectObject(object) {
     selectedObject = object;
     transformControls.attach(object);
     console.log('Objet sélectionné:', object, 'Type:', object.userData.type);
+}
+
+function checkObjectPosition(object) {
+    if (!object) return;
+
+    const box = new THREE.Box3().setFromObject(object);
+    const position = object.position.clone();
+
+    // Limites de la scène (par exemple, empêcher que l'objet sorte des murs)
+    const minX = -2.5 + (box.max.x - box.min.x) / 2;
+    const maxX = 2.5 - (box.max.x - box.min.x) / 2;
+    const minZ = -2.5 + (box.max.z - box.min.z) / 2;
+    const maxZ = 2.5 - (box.max.z - box.min.z) / 2;
+
+    // Vérification et correction de la position
+    if (position.x < minX) position.x = minX;
+    if (position.x > maxX) position.x = maxX;
+    if (position.z < minZ) position.z = minZ;
+    if (position.z > maxZ) position.z = maxZ;
+
+    object.position.copy(position);
 }
 
 function removeObject() {
@@ -292,7 +316,6 @@ function onMouseDoubleClick(event) {
     if (intersects.length > 0) {
         let clickedObject = intersects[0].object;
 
-        // Rechercher le parent avec userData.type (groupe parent)
         while (clickedObject && !clickedObject.userData.type) {
             clickedObject = clickedObject.parent;
         }
