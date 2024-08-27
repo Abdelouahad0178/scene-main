@@ -10,7 +10,7 @@ let objLoader = new THREE.OBJLoader();
 let fbxLoader = new THREE.FBXLoader();
 let sinkModel = null;
 let mirrorModel = null;
-let directionalLight; // Déclaration de la lumière directionnelle
+let directionalLight;
 
 function init() {
     scene = new THREE.Scene();
@@ -40,11 +40,9 @@ function init() {
     camera.position.set(0, 1.5, 5);
     camera.lookAt(0, 1, 0);
 
-    // Lumière ambiante
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    // Lumière directionnelle
     directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
@@ -58,8 +56,8 @@ function init() {
         }
     });
 
-    window.addEventListener('click', onMouseClick, false);
-    window.addEventListener('dblclick', onMouseDoubleClick, false);
+    renderer.domElement.addEventListener('click', onMouseClick, false);
+    renderer.domElement.addEventListener('dblclick', onMouseDoubleClick, false);
     window.addEventListener('resize', onWindowResize, false);
 
     animate();
@@ -80,6 +78,7 @@ function createWalls() {
         }
         
         scene.add(walls[i]);
+        objects.push(walls[i]); // Ajout des murs à la liste des objets
     }
 }
 
@@ -89,6 +88,7 @@ function createFloor() {
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
+    objects.push(floor); // Ajout du sol à la liste des objets
 }
 
 function handleTextureFiles(event) {
@@ -136,18 +136,26 @@ function handleModelFile(event) {
     }
 }
 
+function setUserDataRecursive(object, type) {
+    object.userData.type = type;
+    object.children.forEach(child => setUserDataRecursive(child, type));
+}
+
 function handleModelLoad(model, type) {
-    model.rotation.set(0, 0, 0);
-    model.scale.set(1, 1, 1);
-    centerModel(model);
+    const group = new THREE.Group();  // Crée un groupe pour contenir tout le modèle
+    group.add(model);  // Ajoute le modèle au groupe
+    
+    setUserDataRecursive(group, type);  // Applique le type à tous les sous-objets dans le groupe
+    centerModel(group);  // Centre le groupe plutôt que le modèle seul
 
     if (type === 'sink') {
-        sinkModel = model;
+        sinkModel = group;  // Assigne le groupe à sinkModel
     } else if (type === 'mirror') {
-        mirrorModel = model;
+        mirrorModel = group;  // Assigne le groupe à mirrorModel
     }
 
-    console.log(`Modèle ${type} chargé avec succès`);
+    objects.push(group);  // Ajoute le groupe à la liste des objets manipulables
+    console.log(`Modèle ${type} chargé avec succès`, group);
 }
 
 function centerModel(model) {
@@ -178,27 +186,40 @@ function applyTextureToObject(object, texture) {
 }
 
 function addObject(type) {
+    let newObject;
     if (type === 'sink' && sinkModel) {
-        const newSink = sinkModel.clone();
-        scene.add(newSink);
-        objects.push(newSink);
-        selectObject(newSink);
+        newObject = sinkModel.clone();
     } else if (type === 'mirror' && mirrorModel) {
-        const newMirror = mirrorModel.clone();
-        scene.add(newMirror);
-        objects.push(newMirror);
-        selectObject(newMirror);
+        newObject = mirrorModel.clone();
     } else {
         console.error(`Modèle ${type} non chargé. Veuillez d'abord importer un modèle.`);
+        return;
     }
+    
+    scene.add(newObject);
+    objects.push(newObject);
+    selectObject(newObject);
+    renderer.render(scene, camera); // Force le rendu pour mettre à jour l'affichage
 }
 
 function selectObject(object) {
+    // Rechercher le groupe parent au lieu d'une sous-partie individuelle
+    while (object.parent && object.parent.type !== 'Scene') {
+        object = object.parent;
+    }
+
+    // Si l'objet sélectionné est déjà sélectionné, ne rien faire
+    if (selectedObject === object) {
+        console.log('L\'objet est déjà sélectionné:', object);
+        return;
+    }
+    
     if (selectedObject) {
         transformControls.detach(selectedObject);
     }
     selectedObject = object;
     transformControls.attach(object);
+    console.log('Objet sélectionné:', object, 'Type:', object.userData.type);
 }
 
 function removeObject() {
@@ -207,25 +228,29 @@ function removeObject() {
         objects = objects.filter(obj => obj !== selectedObject);
         transformControls.detach();
         selectedObject = null;
+        console.log('Objet supprimé');
     }
 }
 
 function toggleObjectLock(object) {
+    console.log('Toggling lock for object:', object);
     if (object.userData.locked) {
         object.userData.locked = false;
         transformControls.attach(object);
+        console.log('Objet déverrouillé');
     } else {
         object.userData.locked = true;
         transformControls.detach();
+        console.log('Objet verrouillé');
     }
 }
 
 function onMouseClick(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(objects);
+    const intersects = raycaster.intersectObjects(objects, true);
 
     if (intersects.length > 0) {
         selectObject(intersects[0].object);
@@ -233,14 +258,30 @@ function onMouseClick(event) {
 }
 
 function onMouseDoubleClick(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    console.log('Double clic détecté');
+    mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(objects);
+    const intersects = raycaster.intersectObjects(objects, true);
+
+    console.log('Intersections:', intersects);
 
     if (intersects.length > 0) {
-        toggleObjectLock(intersects[0].object);
+        let clickedObject = intersects[0].object;
+
+        // Rechercher le parent avec userData.type (groupe parent)
+        while (clickedObject && !clickedObject.userData.type) {
+            clickedObject = clickedObject.parent;
+        }
+
+        if (clickedObject && (clickedObject.userData.type === 'sink' || clickedObject.userData.type === 'mirror')) {
+            toggleObjectLock(clickedObject);
+        } else {
+            console.log('L\'objet double-cliqué n\'est ni un lavabo ni un miroir');
+        }
+    } else {
+        console.log('Aucun objet intersecté');
     }
 }
 
