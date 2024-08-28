@@ -42,26 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const reader = new FileReader();
             reader.onload = function (e) {
                 const texture = new THREE.TextureLoader().load(e.target.result, function (texture) {
-                    texture.wrapS = THREE.RepeatWrapping;
-                    texture.wrapT = THREE.RepeatWrapping;
-                    texture.center.set(0.5, 0.5); // Centre la rotation sur la texture
-
-                    // Préservation de la netteté
-                    texture.magFilter = THREE.LinearFilter;  // Améliore la clarté de l'image
-                    texture.minFilter = THREE.LinearMipmapLinearFilter; // Utilise le mipmapping pour maintenir la qualité
-
-                    // Ajustement de l'échelle pour maintenir les proportions correctes de la pièce
-                    const aspectRatio = texture.image.width / texture.image.height;
-                    let repeatX = 8;
-                    let repeatY = 8;
-
-                    if (aspectRatio > 1) {
-                        repeatY = repeatX / aspectRatio;
-                    } else {
-                        repeatX = repeatY * aspectRatio;
-                    }
-
-                    texture.repeat.set(repeatX, repeatY); // Ajuste la répétition pour maintenir la forme originale
                     applyTileToFloor(texture);
                 });
             };
@@ -113,7 +93,7 @@ function init() {
     scene.add(directionalLight);
 
     window.addEventListener('resize', onWindowResize, false);
-    renderer.domElement.addEventListener('click', onMouseClick, false); // Ajout de l'événement clic
+    renderer.domElement.addEventListener('click', onMouseClick, false);
 
     animate();
 }
@@ -135,7 +115,7 @@ function createWalls() {
 }
 
 function createFloor() {
-    const floorGeometry = new THREE.PlaneGeometry(5, 5, 50, 50); // Plus de segments pour un meilleur contrôle des UVs
+    const floorGeometry = new THREE.PlaneGeometry(5, 5);
     const floorMaterial = new THREE.MeshStandardMaterial({
         color: 0xcccccc,
         side: THREE.DoubleSide,
@@ -151,30 +131,35 @@ function createFloor() {
 }
 
 function applyTileToFloor(texture) {
-    // Créer une deuxième texture pour les joints avec une couleur proche du carrelage
-    const jointColor = new THREE.Color(texture.image);
-    jointColor.offsetHSL(0, 0, -0.1); // Ajuster légèrement pour un contraste subtil
-    const jointMaterial = new THREE.MeshBasicMaterial({ color: jointColor });
+    // Assurez-vous que la texture se répète
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
 
-    // Ajuste les UVs pour simuler un joint plus épais et coloré
-    const uvs = floor.geometry.attributes.uv.array;
-    for (let i = 0; i < uvs.length; i += 2) {
-        // Créer un joint plus épais en ajustant davantage les UVs
-        if (uvs[i] % 1 < 0.1 || uvs[i] % 1 > 0.9) {
-            uvs[i] += 0.05; // Déplacement horizontal pour les joints
-        }
-        if (uvs[i + 1] % 1 < 0.1 || uvs[i + 1] % 1 > 0.9) {
-            uvs[i + 1] += 0.05; // Déplacement vertical pour les joints
-        }
-    }
+    // Obtenez les dimensions du sol
+    const floorWidth = floor.geometry.parameters.width;
+    const floorHeight = floor.geometry.parameters.height;
 
-    floor.geometry.attributes.uv.needsUpdate = true;
+    // Calculez le rapport d'aspect de la texture
+    const textureAspectRatio = texture.image.width / texture.image.height;
 
-    // Appliquer la texture et le matériau de joint
-    floor.material = jointMaterial;
+    // Définissez le nombre souhaité de carreaux sur la largeur du sol
+    const desiredTilesAcross = 5; // Vous pouvez ajuster ce nombre
+
+    // Calculez la répétition nécessaire pour obtenir le nombre souhaité de carreaux
+    const repeatX = desiredTilesAcross;
+    const repeatY = desiredTilesAcross / textureAspectRatio * (floorHeight / floorWidth);
+
+    // Appliquez la répétition à la texture
+    texture.repeat.set(repeatX, repeatY);
+
+    // Assurez-vous que la texture est centrée
+    texture.center.set(0.5, 0.5);
+
+    // Appliquez la texture au matériau du sol
     floor.material.map = texture;
     floor.material.needsUpdate = true;
-    console.log('Carrelage appliqué au sol avec joints simulés.');
+
+    console.log(`Carrelage appliqué au sol avec ${repeatX.toFixed(2)}x${repeatY.toFixed(2)} répétitions`);
 }
 
 function applyPaintToAllWalls(color) {
@@ -211,9 +196,11 @@ function onMouseClick(event) {
         const clickedObject = intersects[0].object;
 
         // Changement de l'orientation du carrelage
-        if (clickedObject === floor) {
-            clickedObject.material.map.rotation += Math.PI / 2; // Tourne de 90 degrés
+        if (clickedObject === floor && clickedObject.material.map) {
+            const currentRotation = clickedObject.material.map.rotation;
+            clickedObject.material.map.rotation = (currentRotation + Math.PI / 2) % (Math.PI * 2);
             clickedObject.material.needsUpdate = true;
+            console.log('Rotation du carrelage appliquée');
         }
 
         // Changement de la couleur du mur
