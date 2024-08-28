@@ -12,76 +12,39 @@ canvas {
 
 .controls {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(255, 255, 255, 0.8);
     padding: 10px;
     display: flex;
-    justify-content: center;
     align-items: center;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
-.file-inputs, .action-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.file-input {
-    display: none;
-}
-
-.file-label, .btn {
-    display: inline-block;
-    background-color: #3498db;
-    color: white;
-    padding: 8px 12px;
-    margin: 5px;
+button, select, input {
+    padding: 8px;
+    font-size: 14px;
+    border: none;
     border-radius: 3px;
     cursor: pointer;
-    text-align: center;
     transition: background-color 0.3s;
-    font-size: 14px;
 }
 
-.file-label:hover, .btn:hover {
+button:hover, select:hover, input:hover {
+    background-color: #ddd;
+}
+
+button:active, select:active, input:active {
+    background-color: #ccc;
+}
+
+#applyToAll {
+    background-color: #3498db;
+    color: white;
+}
+
+#applyToAll:hover {
     background-color: #2980b9;
-}
-
-/* Light control slider */
-.light-control {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.light-label {
-    margin-right: 10px;
-    font-size: 14px;
-    color: #333;
-}
-
-.slider {
-    width: 150px;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-    .controls {
-        flex-direction: column;
-    }
-    
-    .file-inputs, .action-buttons {
-        width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .file-label, .btn {
-        font-size: 12px;
-        padding: 6px 10px;
-    }
 }
